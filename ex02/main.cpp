@@ -57,13 +57,13 @@ int main(int argc, char **argv)
 	printContainer(sortedVec);
 
 	double durationVec = 1000000.0 * (double)(endVec - startVec) / CLOCKS_PER_SEC;
-	std::cout << "Time to process a range of " << numbers.size() << " elements with std::vector : " << durationVec << " us" << std::endl;
+	std::cout << "Time to process a range of " << numbers.size() << " elements with std::vector: " << durationVec << " us" << std::endl;
 
 	std::clock_t startDeque = std::clock();
 	std::deque<int> sortedDeque = PmergeMe::mergeInsertSort(numbersDeque);
 	std::clock_t endDeque = std::clock();
 
 	double durationDeque = 1000000.0 * (double)(endDeque - startDeque) / CLOCKS_PER_SEC;
-	std::cout << "Time to process a range of " << numbers.size() << " elements with std::deque : " << durationDeque << " us" << std::endl;
+	std::cout << "Time to process a range of " << numbers.size() << " elements with std::deque: " << durationDeque << " us" << std::endl;
 
 }
