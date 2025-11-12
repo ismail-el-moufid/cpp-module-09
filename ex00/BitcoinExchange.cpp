@@ -18,12 +18,17 @@ BitcoinExchange::~BitcoinExchange() {}
 
 bool BitcoinExchange::loadData(const std::string &filename)
 {
-		double rate;
+	double rate;
 
 	std::ifstream file(filename.c_str());
 	if (!file.is_open())
-		return (false);
+		return false;
+
 	std::string line;
+
+	if (!std::getline(file, line))
+		return false;
+
 	while (std::getline(file, line))
 	{
 		std::istringstream ss(line);
@@ -31,9 +36,11 @@ bool BitcoinExchange::loadData(const std::string &filename)
 		if (std::getline(ss, date, ',') && ss >> rate)
 			exchangeRates[date] = rate;
 	}
+
 	file.close();
-	return (true);
+	return true;
 }
+
 
 bool BitcoinExchange::getExchangeRate(const std::string &date, double &rate) const
 {

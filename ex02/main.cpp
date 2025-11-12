@@ -1,8 +1,5 @@
 #include "PmergeMe.hpp"
 #include <iostream>
-#include <ctime>
-#include <cstdlib>
-#include <cctype>
 
 bool isNumber(const std::string &s)
 {
