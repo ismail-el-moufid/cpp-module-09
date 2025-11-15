@@ -3,88 +3,47 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <cctype>
+#include <cstdlib>
 
-static std::string trim(const std::string &s)
+std::string getDataFilePath()
 {
-	size_t start = s.find_first_not_of(" 0\t");
+	DIR *dir = opendir(".");
+	if (!dir)
+		return "";
 
-	if (start == std::string::npos)
-		return ("");
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL)
+	{
+		std::string fname(entry->d_name);
 
-	size_t end = s.find_last_not_of(" \t");
-	return (s.substr(start, end - start + 1));
+		if (fname == "." || fname == "..")
+			continue;
+
+		if (fname.size() >= 4)
+		{
+			std::string ext = fname.substr(fname.size() - 4);
+			for (size_t i = 0; i < ext.size(); ++i)
+				ext[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(ext[i])));
+
+			if (ext == ".csv")
+			{
+				struct stat st;
+				if (stat(fname.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+				{
+					closedir(dir);
+					return fname;
+				}
+			}
+		}
+	}
+
+	closedir(dir);
+	return "";
 }
 
-static int	daysInMonth(int y, int m)
-{
-	static const int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-	if (m == 2)
-		return ((y % 4 == 0 && ((y % 100 != 0) || (y % 400 == 0))) ? 29 : 28);
-
-	if (m >= 1 && m <= 12)
-		return (mdays[m - 1]);
-
-	return (0);
-}
-
-static bool	isAllDigits(const std::string &s)
-{
-	if (s.empty())
-		return (false);
-
-	for (size_t i = 0; i < s.size(); ++i)
-		if (!std::isdigit(static_cast<unsigned char>(s[i])))
-			return (false);
-
-	return (true);
-}
-
-static bool	isValidDate(const std::string &date)
-{
-	int	y;
-	int	m;
-	int	d;
-
-	if (date.size() != 10)
-		return (false);
-
-	std::string ys = date.substr(0, date.find_first_of('-'));
-	std::string ms = date.substr(date.find_first_of('-') + 1,  date.find_last_of('-')  - date.find_first_of('-') - 1);
-	std::string ds = date.substr(date.find_last_of('-') + 1);
-
-	if (ys.size() + ms.size() + ds.size() + 2 != date.size() ||
-		!isAllDigits(ys) || !isAllDigits(ms) || !isAllDigits(ds))
-		return false;
-
-	y = std::atoi(ys.c_str());
-	m = std::atoi(ms.c_str());
-	d = std::atoi(ds.c_str());
-
-	if (m < 1 || m > 12)
-		return false;
-
-	if (d < 1 || d > daysInMonth(y, m))
-		return false;
-
-	return true;
-}
-
-static bool	parseDouble(const std::string &text, double &out)
-{
-	char	c;
-
-	std::istringstream iss(text);
-	iss >> out;
-
-	if (iss.fail())
-		return false;
-
-	if (iss >> c)
-		return false;
-
-	return true;
-}
 
 int	main(int argc, char **argv)
 {
@@ -95,49 +54,94 @@ int	main(int argc, char **argv)
 	}
 
 	BitcoinExchange bitcoinExchange;
-	if (!bitcoinExchange.loadData("data.csv"))
+	std::string dataFile = getDataFilePath();
+	if (dataFile.empty() || !bitcoinExchange.loadData(dataFile))
 	{
-		std::cerr << "Error: Could not load data from file." << std::endl;
+		std::cerr << "Error: could not load database." << std::endl;
 		return 1;
 	}
 
 	std::ifstream in(argv[1]);
 	if (!in.is_open())
 	{
-		std::cerr << "Error: could not open file." << std::endl;
+		std::cerr << "Error: could not open input file." << std::endl;
 		return 1;
 	}
 
 	std::string line;
-	std::getline(in, line);
+	if (!std::getline(in, line))
+	{
+		std::cerr << "Error: input file is empty." << std::endl;
+		return 1;
+	}
+	
+	std::string trimmedLine = line;
+	size_t start = trimmedLine.find_first_not_of(" \t");
+	if (start != std::string::npos)
+	{
+		size_t end = trimmedLine.find_last_not_of(" \t");
+		trimmedLine = trimmedLine.substr(start, end - start + 1);
+	}
+	
+	if (trimmedLine != "date | value")
+	{
+		std::cerr << "Error: invalid input file header." << std::endl;
+		return 1;
+	}
+
 	while (std::getline(in, line))
 	{
-		line = trim(line);
+		start = line.find_first_not_of(" \t");
+		if (start == std::string::npos)
+			continue;
+		size_t end = line.find_last_not_of(" \t");
+		line = line.substr(start, end - start + 1);
+		
 		if (line.empty())
 			continue ;
 
 		size_t bar = line.find('|');
 		if (bar == std::string::npos)
 		{
-			std::cerr << "Error: bad input => " << line << std::endl;
+			std::cerr << "Error: invalid input => " << line << std::endl;
 			continue ;
 		}
 
-		std::string date = trim(line.substr(0, bar));
-		std::string valueStr = trim(line.substr(bar + 1));
+		std::string date = line.substr(0, bar);
+		start = date.find_first_not_of(" \t");
+		if (start != std::string::npos) {
+			end = date.find_last_not_of(" \t");
+			date = date.substr(start, end - start + 1);
+		}
+		
+		std::string valueStr = line.substr(bar + 1);
+		start = valueStr.find_first_not_of(" \t");
+		if (start != std::string::npos) {
+			end = valueStr.find_last_not_of(" \t");
+			valueStr = valueStr.substr(start, end - start + 1);
+		}
 
-		if (!isValidDate(date))
+		if (date.size() != 10 || date[4] != '-' || date[7] != '-')
 		{
-			std::cerr << "Error: bad input => " << line << std::endl;
+			std::cerr << "Error: invalid input => " << line << std::endl;
 			continue ;
 		}
 
 		double value;
-		if (!parseDouble(valueStr, value))
+		std::istringstream iss(valueStr);
+		iss >> value;
+		if (iss.fail())
 		{
 			std::cerr << "Error: bad input => " << line << std::endl;
 			continue ;
 		}
+		char c;
+		if (iss >> c)
+		{
+			std::cerr << "Error: bad input => " << line << std::endl;
+			continue ;
+		}
+		
 		if (value < 0)
 		{
 			std::cerr << "Error: not a positive number." << std::endl;
@@ -160,5 +164,5 @@ int	main(int argc, char **argv)
 		std::cout << date << " => " << value << " = " << result << std::endl;
 	}
 	in.close();
-
+	return 0;
 }

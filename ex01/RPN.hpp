@@ -6,15 +6,15 @@ class RPN
 {
 
 private:
-	bool isOperator(char c) const;
-	int performOperation(char op, int a, int b) const;
-
-public:
 	RPN();
 	RPN(const RPN &other);
 	RPN &operator=(const RPN &other);
 	~RPN();
+	
 
-	int evaluate(const std::string &expression);
+public:
+	static bool isOperator(char c);
+	static int performOperation(char op, int a, int b);
+	static int evaluate(const std::string &expression);
 
 };

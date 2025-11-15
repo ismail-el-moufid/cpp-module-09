@@ -1,13 +1,27 @@
 #include "PmergeMe.hpp"
 #include <iostream>
+#include <ctime>
+#include <cstdlib>
+#include <cctype>
+#include <cerrno>
+#include <limits>
 
 bool isNumber(const std::string &s)
 {
 	if (s.empty())
 		return false;
-	for (size_t i = 0; i < s.size(); ++i)
-		if (!std::isdigit(s[i]))
+	size_t i = 0;
+	if (s[0] == '+')
+	{
+		if (s.size() == 1)
 			return false;
+		i = 1;
+	}
+	for (; i < s.size(); ++i)
+	{
+		if (!std::isdigit(static_cast<unsigned char>(s[i])))
+			return false;
+	}
 	return true;
 }
 
@@ -26,7 +40,10 @@ void printContainer(const T &cont)
 int main(int argc, char **argv)
 {
 	if (argc < 2)
-		return 0;
+	{
+		std::cerr << "Error: no input provided" << std::endl;
+		return 1;
+	}
 
 	std::vector<int> numbers;
 	for (int i = 1; i < argc; ++i)
@@ -34,10 +51,20 @@ int main(int argc, char **argv)
 		std::string arg(argv[i]);
 		if (!isNumber(arg))
 		{
-			std::cerr << "Error" << std::endl;
+			std::cerr << "Error: invalid input: " << arg << std::endl;
 			return 1;
 		}
-		numbers.push_back(std::atoi(argv[i]));
+
+		errno = 0;
+		char *end = NULL;
+		unsigned long val = std::strtoul(argv[i], &end, 10);
+		if (errno == ERANGE || end == argv[i] || *end != '\0' ||
+			val > static_cast<unsigned long>(std::numeric_limits<int>::max()))
+		{
+			std::cerr << "Error: number out of range: " << arg << std::endl;
+			return 1;
+		}
+		numbers.push_back(static_cast<int>(val));
 	}
 
 	std::vector<int> numbersVec(numbers.begin(), numbers.end());
@@ -63,4 +90,5 @@ int main(int argc, char **argv)
 	double durationDeque = 1000000.0 * (double)(endDeque - startDeque) / CLOCKS_PER_SEC;
 	std::cout << "Time to process a range of " << numbers.size() << " elements with std::deque: " << durationDeque << " us" << std::endl;
 
+	return 0;
 }

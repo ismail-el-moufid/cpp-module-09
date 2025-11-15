@@ -1,5 +1,8 @@
 #include "RPN.hpp"
 #include <stack>
+#include <cctype>
+#include <sstream>
+#include <stdexcept>
 
 RPN::RPN() {}
 
@@ -13,12 +16,12 @@ RPN &RPN::operator=(const RPN &other)
 
 RPN::~RPN() {}
 
-bool RPN::isOperator(char c) const
+bool RPN::isOperator(char c)
 {
 	return c == '+' || c == '-' || c == '*' || c == '/';
 }
 
-int RPN::performOperation(char op, int a, int b) const
+int RPN::performOperation(char op, int a, int b)
 {
 	switch (op)
 	{
@@ -40,35 +43,30 @@ int RPN::performOperation(char op, int a, int b) const
 int RPN::evaluate(const std::string &expression)
 {
 	std::stack<int> stack;
+	std::istringstream iss(expression);
+	std::string token;
 
-	for (size_t i = 0; i < expression.length(); ++i)
+	while (iss >> token)
 	{
-		char token = expression[i];
-
-		if (std::isspace(token))
-			continue;
-
-		if (std::isdigit(token))
+		if (token.size() == 1 && std::isdigit(static_cast<unsigned char>(token[0])))
 		{
-			stack.push(token - '0');
+			stack.push(token[0] - '0');
+			continue;
 		}
-		else if (isOperator(token))
+
+		if (token.size() == 1 && isOperator(token[0]))
 		{
 			if (stack.size() < 2)
 				throw std::runtime_error("Insufficient operands");
 
-			int b = stack.top();
-			stack.pop();
-			int a = stack.top();
-			stack.pop();
+			int b = stack.top(); stack.pop();
+			int a = stack.top(); stack.pop();
 
-			int result = performOperation(token, a, b);
+			int result = performOperation(token[0], a, b);
 			stack.push(result);
 		}
 		else
-		{
-			throw std::runtime_error("Invalid character in expression");
-		}
+			throw std::runtime_error("Invalid token in expression");
 	}
 
 	if (stack.size() != 1)

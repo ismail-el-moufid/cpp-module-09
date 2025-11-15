@@ -5,17 +5,15 @@ int main(int argc, char **argv)
 {
 	if (argc != 2)
 	{
-		std::cerr << "Usage: " << (argc > 0 ? argv[0] : "./RPN") << " \"<RPN expression>\"" << std::endl;
+		std::cerr << "Error: invalid number of arguments" << std::endl;
 		return 1;
 	}
 
 	std::string expression = argv[1];
-	RPN rpn;
 
 	try
 	{
-		int result = rpn.evaluate(expression);
-		std::cout << result << std::endl;
+		std::cout << RPN::evaluate(expression) << std::endl;
 	}
 	catch (const std::exception &e)
 	{
