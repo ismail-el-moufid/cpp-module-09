@@ -1,9 +1,11 @@
 #include "PmergeMe.hpp"
 #include <vector>
 #include <deque>
-#include <algorithm>
 #include <cstdlib>
 #include <limits>
+#include <iostream>
+
+#define ENABLE_LOGS 1
 
 PmergeMe::PmergeMe() {}
 
@@ -17,172 +19,300 @@ PmergeMe& PmergeMe::operator=(const PmergeMe& other)
 
 PmergeMe::~PmergeMe() {}
 
-static std::vector<size_t> jacobsthalOrder(size_t m)
+static std::vector<size_t> jacobsthalOrder(size_t count)
 {
 	std::vector<size_t> order;
-	if (m == 0)
+	if (count == 0)
 		return order;
 
-	std::vector<size_t> js;
-	size_t J0 = 0;
-	size_t J1 = 1;
-	
-	while (J1 < m)
+	std::vector<size_t> jacobsthalNumbers;
+	size_t prev = 0;
+	size_t curr = 1;
+
+	while (curr < count)
 	{
-		js.push_back(J1);
-		if (J1 > (std::numeric_limits<size_t>::max() - J0) / 2)
+		jacobsthalNumbers.push_back(curr);
+		if (curr > (std::numeric_limits<size_t>::max() - prev) / 2)
 			break;
-		size_t Jn = J1 + 2 * J0;
-		if (Jn >= m)
+		size_t next = curr + 2 * prev;
+		if (next >= count)
 			break;
-		J0 = J1;
-		J1 = Jn;
+		prev = curr;
+		curr = next;
 	}
 
-	std::vector<char> used(m, 0);
-	if (m > 0)
+	std::vector<char> inserted(count, 0);
+	if (count > 0)
 	{
 		order.push_back(0);
-		used[0] = 1;
+		inserted[0] = 1;
 	}
 
-	for (size_t i = 0; i < js.size(); ++i)
+	for (size_t i = 0; i < jacobsthalNumbers.size(); ++i)
 	{
-		size_t jval = js[i];
-		size_t prev = (i > 0) ? js[i - 1] : 0;
+		size_t currentJacobsthal = jacobsthalNumbers[i];
+		size_t previousJacobsthal = (i > 0) ? jacobsthalNumbers[i - 1] : 0;
 		
-		for (size_t idx = jval; idx > prev; --idx)
+		for (size_t idx = currentJacobsthal; idx > previousJacobsthal; --idx)
 		{
-			if (idx < m && !used[idx])
+			if (idx < count && !inserted[idx])
 			{
 				order.push_back(idx);
-				used[idx] = 1;
+				inserted[idx] = 1;
 			}
 		}
 	}
 
-	for (size_t i = 0; i < m; ++i)
-		if (!used[i])
+	for (size_t i = 0; i < count; ++i)
+		if (!inserted[i])
 			order.push_back(i);
 
 	return order;
 }
 
-void binaryInsert(std::vector<int> &mainChain, int value)
+void binaryInsert(std::vector<int> &result, int value, size_t &comparisons)
 {
-	std::vector<int>::iterator it = std::lower_bound(mainChain.begin(), mainChain.end(), value);
-	mainChain.insert(it, value);
+	size_t low = 0;
+	size_t high = result.size() > 0 ? result.size() - 1 : 0;
+
+	if (result.empty())
+	{
+		result.push_back(value);
+		return;
+	}
+
+	while (low <= high)
+	{
+		size_t mid = low + (high - low) / 2;
+		comparisons++;
+		if (value <= result[mid])
+		{
+			if (mid == 0)
+				break;
+			high = mid - 1;
+		}
+		else
+			low = mid + 1;
+	}
+	result.insert(result.begin() + low, value);
+}
+
+void binaryInsert(std::deque<int> &result, int value, size_t &comparisons)
+{
+	size_t low = 0;
+	size_t high = result.size() > 0 ? result.size() - 1 : 0;
+
+	if (result.empty())
+	{
+		result.push_back(value);
+		return;
+	}
+
+	while (low <= high)
+	{
+		size_t mid = low + (high - low) / 2;
+		comparisons++;
+		if (value <= result[mid])
+		{
+			if (mid == 0)
+				break;
+			high = mid - 1;
+		}
+		else
+			low = mid + 1;
+	}
+	result.insert(result.begin() + low, value);
 }
 
 std::vector<int> PmergeMe::mergeInsertSort(const std::vector<int> &data)
 {
-	size_t n = data.size();
-	if (n <= 1)
-		return data;
-
-	std::vector<int> larger;
-	std::vector<int> smaller;
-	larger.reserve(n / 2 + 1);
-	smaller.reserve(n / 2 + 1);
-
-	size_t i = 0;
-	for (; i + 1 < n; i += 2)
+	static size_t originalSize = 0;
+	static bool isTopLevel = true;
+	static size_t comparisons = 0;
+	
+	if (isTopLevel)
 	{
-		int a = data[i];
-		int b = data[i + 1];
-		if (a > b)
+		originalSize = data.size();
+		isTopLevel = false;
+		comparisons = 0;
+	}
+	
+	size_t size = data.size();
+	if (size <= 1)
+	{
+		if (size == originalSize)
 		{
-			larger.push_back(a);
-			smaller.push_back(b);
+			std::cout << "Number of comparisons (vector): " << comparisons << std::endl;
+			isTopLevel = true;
 		}
+		return data;
+	}
+
+	std::vector<std::pair<int, int> > pairs;
+
+	size_t index = 0;
+	for (; index + 1 < size; index += 2)
+	{
+		int first = data[index];
+		int second = data[index + 1];
+		if (first > second)
+			pairs.push_back(std::make_pair(first, second));
 		else
+			pairs.push_back(std::make_pair(second, first));
+	}
+
+	bool hasStraggler = (index < size);
+	int straggler = hasStraggler ? data[index] : 0;
+
+	std::vector<int> largerElements;
+	for (size_t i = 0; i < pairs.size(); ++i)
+		largerElements.push_back(pairs[i].first);
+
+	std::vector<int> sortedLarger = mergeInsertSort(largerElements);
+
+	std::vector<int> smallerElements;
+	for (size_t i = 0; i < sortedLarger.size(); ++i)
+	{
+		for (size_t j = 0; j < pairs.size(); ++j)
 		{
-			larger.push_back(b);
-			smaller.push_back(a);
+			if (pairs[j].first == sortedLarger[i])
+			{
+				smallerElements.push_back(pairs[j].second);
+				pairs[j].first = -1;
+				break;
+			}
 		}
 	}
 
-	bool hasLeftover = (i < n);
-	int leftover = hasLeftover ? data[i] : 0;
-
-	std::vector<int> sortedLarger = mergeInsertSort(larger);
-	
 	std::vector<int> result;
-	result.reserve(n);
-	
-	if (!smaller.empty())
-		result.push_back(smaller[0]);
-	
+
+	if (!smallerElements.empty())
+		result.push_back(smallerElements[0]);
 	result.insert(result.end(), sortedLarger.begin(), sortedLarger.end());
 
-	std::vector<size_t> order = jacobsthalOrder(smaller.size());
-	for (size_t j = 1; j < order.size(); ++j)
+	std::vector<size_t> insertionOrder = jacobsthalOrder(smallerElements.size());
+	
+#if ENABLE_LOGS
+	if (size == originalSize && originalSize > 2)
 	{
-		size_t idx = order[j];
-		if (idx < smaller.size())
-			binaryInsert(result, smaller[idx]);
+		for (size_t i = 0; i < smallerElements.size(); ++i)
+		{
+			std::cout << "  smallerElements[" << i << "] = " << smallerElements[i];
+			for (size_t j = 0; j < insertionOrder.size(); ++j)
+			{
+				if (insertionOrder[j] == i)
+				{
+					std::cout << "  <-- insert order " << j;
+					break;
+				}
+			}
+			std::cout << std::endl;
+		}
+	}
+#endif
+	
+	for (size_t i = 0; i < insertionOrder.size(); ++i)
+	{
+		size_t idx = insertionOrder[i];
+		if (idx > 0 && idx < smallerElements.size())
+			binaryInsert(result, smallerElements[idx], comparisons);
 	}
 
-	if (hasLeftover)
-		binaryInsert(result, leftover);
+	if (hasStraggler)
+		binaryInsert(result, straggler, comparisons);
+
+	if (size == originalSize)
+	{
+		std::cout << "Number of comparisons (vector): " << comparisons << std::endl;
+		isTopLevel = true;
+	}
 
 	return result;
 }
 
-void binaryInsert(std::deque<int> &mainChain, int value)
-{
-	std::deque<int>::iterator it = std::lower_bound(mainChain.begin(), mainChain.end(), value);
-	mainChain.insert(it, value);
-}
-
 std::deque<int> PmergeMe::mergeInsertSort(const std::deque<int> &data)
 {
-	size_t n = data.size();
-	if (n <= 1)
-		return data;
-
-	std::deque<int> larger;
-	std::deque<int> smaller;
-
-	size_t i = 0;
-	for (; i + 1 < n; i += 2)
+	static size_t originalSize = 0;
+	static bool isTopLevel = true;
+	static size_t comparisons = 0;
+	
+	if (isTopLevel)
 	{
-		int a = data[i];
-		int b = data[i + 1];
-		if (a > b)
-		{
-			larger.push_back(a);
-			smaller.push_back(b);
-		}
-		else
-		{
-			larger.push_back(b);
-			smaller.push_back(a);
-		}
+		originalSize = data.size();
+		isTopLevel = false;
+		comparisons = 0;
 	}
 	
-	bool hasLeftover = (i < n);
-	int leftover = hasLeftover ? data[i] : 0;
+	size_t size = data.size();
+	if (size <= 1)
+	{
+		if (size == originalSize)
+		{
+			std::cout << "Number of comparisons (deque): " << comparisons << std::endl;
+			isTopLevel = true;
+		}
+		return data;
+	}
 
-	std::deque<int> sortedLarger = mergeInsertSort(larger);
-	
+	std::vector<std::pair<int, int> > pairs;
+
+	size_t index = 0;
+	for (; index + 1 < size; index += 2)
+	{
+		int first = data[index];
+		int second = data[index + 1];
+		if (first > second)
+			pairs.push_back(std::make_pair(first, second));
+		else
+			pairs.push_back(std::make_pair(second, first));
+	}
+
+	bool hasStraggler = (index < size);
+	int straggler = hasStraggler ? data[index] : 0;
+
+	std::deque<int> largerElements;
+	for (size_t i = 0; i < pairs.size(); ++i)
+		largerElements.push_back(pairs[i].first);
+
+	std::deque<int> sortedLarger = mergeInsertSort(largerElements);
+
+	std::deque<int> smallerElements;
+	for (size_t i = 0; i < sortedLarger.size(); ++i)
+	{
+		for (size_t j = 0; j < pairs.size(); ++j)
+		{
+			if (pairs[j].first == sortedLarger[i])
+			{
+				smallerElements.push_back(pairs[j].second);
+				pairs[j].first = -1;
+				break;
+			}
+		}
+	}
+
 	std::deque<int> result;
-	
-	if (!smaller.empty())
-		result.push_back(smaller[0]);
-	
+
+	if (!smallerElements.empty())
+		result.push_back(smallerElements[0]);
 	result.insert(result.end(), sortedLarger.begin(), sortedLarger.end());
 
-	std::vector<size_t> order = jacobsthalOrder(smaller.size());
-	for (size_t j = 1; j < order.size(); ++j)
+	std::vector<size_t> insertionOrder = jacobsthalOrder(smallerElements.size());
+	
+	for (size_t i = 0; i < insertionOrder.size(); ++i)
 	{
-		size_t idx = order[j];
-		if (idx < smaller.size())
-			binaryInsert(result, smaller[idx]);
+		size_t idx = insertionOrder[i];
+		if (idx > 0 && idx < smallerElements.size())
+			binaryInsert(result, smallerElements[idx], comparisons);
 	}
 
-	if (hasLeftover)
-		binaryInsert(result, leftover);
+	if (hasStraggler)
+		binaryInsert(result, straggler, comparisons);
+
+	if (size == originalSize)
+	{
+		std::cout << "Number of comparisons (deque): " << comparisons << std::endl;
+		isTopLevel = true;
+	}
 
 	return result;
 }

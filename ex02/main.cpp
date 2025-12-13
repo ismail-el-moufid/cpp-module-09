@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	std::vector<int> numbers;
+	std::vector<int> numbersVec;
 	for (int i = 1; i < argc; ++i)
 	{
 		std::string arg(argv[i]);
@@ -64,11 +64,10 @@ int main(int argc, char **argv)
 			std::cerr << "Error: number out of range: " << arg << std::endl;
 			return 1;
 		}
-		numbers.push_back(static_cast<int>(val));
+		numbersVec.push_back(static_cast<int>(val));
 	}
 
-	std::vector<int> numbersVec(numbers.begin(), numbers.end());
-	std::deque<int> numbersDeque(numbers.begin(), numbers.end());
+	std::deque<int> numbersDeque(numbersVec.begin(), numbersVec.end());
 
 	std::cout << "Before: ";
 	printContainer(numbersVec);
@@ -77,18 +76,20 @@ int main(int argc, char **argv)
 	std::vector<int> sortedVec = PmergeMe::mergeInsertSort(numbersVec);
 	std::clock_t endVec = std::clock();
 
-	std::cout << "After: ";
-	printContainer(sortedVec);
-
-	double durationVec = 1000000.0 * (double)(endVec - startVec) / CLOCKS_PER_SEC;
-	std::cout << "Time to process a range of " << numbers.size() << " elements with std::vector: " << durationVec << " us" << std::endl;
-
 	std::clock_t startDeque = std::clock();
 	std::deque<int> sortedDeque = PmergeMe::mergeInsertSort(numbersDeque);
 	std::clock_t endDeque = std::clock();
 
-	double durationDeque = 1000000.0 * (double)(endDeque - startDeque) / CLOCKS_PER_SEC;
-	std::cout << "Time to process a range of " << numbers.size() << " elements with std::deque: " << durationDeque << " us" << std::endl;
+	double durationVec = 1000000.0 * (double)(endVec - startVec) / CLOCKS_PER_SEC;
+	std::cout << "Time to process a range of " << numbersVec.size() << " elements with std::vector: " << durationVec << " us" << std::endl;
 
+	double durationDeque = 1000000.0 * (double)(endDeque - startDeque) / CLOCKS_PER_SEC;
+	std::cout << "Time to process a range of " << numbersVec.size() << " elements with std::deque: " << durationDeque << " us" << std::endl;
+
+	std::cout << "After (vector): ";
+	printContainer(sortedVec);
+
+	std::cout << "After (deque): ";
+	printContainer(sortedDeque);
 	return 0;
 }
