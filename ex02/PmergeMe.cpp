@@ -2,257 +2,198 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <cstddef>
 
+#include <iostream>
 
-static std::vector<std::size_t> jacobsthalOrder(std::size_t n)
-{
-	std::vector<std::size_t> order;
-	if (n == 0) return order;
-
-	// Generate Jacobsthal numbers up to n
-	std::vector<std::size_t> jac;
-	jac.push_back(0);
-	jac.push_back(1);
-	while (jac.back() < n)
-	{
-		std::size_t next = jac.back() + 2 * jac[jac.size() - 2];
-		if (next > n) break;
-		jac.push_back(next);
-	}
-
-	// Build insertion order: for each Jacobsthal block, insert backwards
-	for (std::size_t i = 2; i < jac.size(); ++i)
-	{
-		std::size_t start = std::min(jac[i], n);
-		std::size_t end = jac[i - 1] + 1;
-		for (std::size_t k = start; k >= end && k > 0; --k)
-			order.push_back(k - 1);
-	}
-
-	// Add any remaining elements
-	if (!jac.empty() && jac.back() < n)
-		for (std::size_t k = n; k > jac.back(); --k)
-			order.push_back(k - 1);
-
-	return order;
-}
-
-template<typename T>
+// =======================================================
+// Pair structure
+// =======================================================
 struct Pair
 {
-	T winner;
-	T loser;
-	Pair() : winner(T()), loser(T()) {}
-	Pair(T w, T l) : winner(w), loser(l) {}
-	bool operator<(const Pair &other) const { return winner < other.winner; }
+	int winner;
+	int loser;
+	Pair(int winnerValue = 0, int loserValue = 0) : winner(winnerValue), loser(loserValue) {}
 };
 
-// ----------------------------------------------------------------
-// Vector version of Ford-Johnson algorithm
-// ----------------------------------------------------------------
-
-static void fordJohnsonVector(std::vector<int> &data)
+// =======================================================
+// Jacobsthal order
+// =======================================================
+static std::vector<std::size_t> jacobsthalOrder(std::size_t size)
 {
-	typedef int T;
-	std::size_t n = data.size();
+	std::vector<std::size_t> insertionOrder;
 
-	// Base cases
-	if (n <= 1)
-		return;
-	if (n == 2)
+	if (size == 0)
+		return insertionOrder;
+
+	// Generate Jacobsthal numbers
+	std::vector<std::size_t> jacobsthalNumbers;
+	jacobsthalNumbers.push_back(0);
+	jacobsthalNumbers.push_back(1);
+	while (jacobsthalNumbers.back() < size)
 	{
-		if (data[0] > data[1])
-			std::swap(data[0], data[1]);
-		return;
+		std::size_t nextJacobsthal = jacobsthalNumbers.back() + 2 * jacobsthalNumbers[jacobsthalNumbers.size() - 2];
+		jacobsthalNumbers.push_back(nextJacobsthal);
 	}
 
-	// Step 1: Pair and compare
-	std::vector<Pair<T> > pairs;
-	pairs.reserve(n / 2 + 1);
-	for (std::size_t i = 0; i + 1 < n; i += 2)
+	// Build insertion order following Jacobsthal sequence
+	std::vector<bool> isIndexAdded(size, false);
+	for (std::size_t jacobIndex = 2; jacobIndex < jacobsthalNumbers.size(); ++jacobIndex)
 	{
-		if (data[i] > data[i + 1])
-			pairs.push_back(Pair<T>(data[i], data[i + 1]));
+		std::size_t rangeStart = std::min(jacobsthalNumbers[jacobIndex], size);
+		std::size_t rangeEnd = jacobsthalNumbers[jacobIndex - 1];
+		for (std::size_t currentIndex = rangeStart; currentIndex > rangeEnd; --currentIndex)
+		{
+			if (currentIndex - 1 < size && !isIndexAdded[currentIndex - 1])
+			{
+				insertionOrder.push_back(currentIndex - 1);
+				isIndexAdded[currentIndex - 1] = true;
+			}
+		}
+	}
+
+	// Add any remaining indices not covered by Jacobsthal sequence
+	for (std::size_t index = 0; index < size; ++index)
+		if (!isIndexAdded[index])
+			insertionOrder.push_back(index);
+
+	return insertionOrder;
+}
+
+// =======================================================
+// Ford-Johnson merge-insert sort (recursive)
+// =======================================================
+std::vector<int> PmergeMe::mergeInsertSort(const std::vector<int>& data)
+{
+	const std::size_t dataSize = data.size();
+	if (dataSize <= 1)
+		return data;
+
+	if (dataSize == 2)
+	{
+		if (data[0] <= data[1])
+			return data;
 		else
-			pairs.push_back(Pair<T>(data[i + 1], data[i]));
+		{
+			std::vector<int> tmp;
+			tmp.push_back(data[1]);
+			tmp.push_back(data[0]);
+			return tmp;
+		}
 	}
 
-	// Handle odd element
-	T straggler = T();
-	bool hasStraggler = (n % 2 == 1);
-	if (hasStraggler)
-		straggler = data[n - 1];
+	// Create pairs
+	std::vector<Pair> pairs;
+	pairs.reserve((dataSize + 1) / 2);
 
-	// Step 2: Recursively sort winners
+	for (std::size_t index = 0; index + 1 < dataSize; index += 2)
+	{
+		if (data[index] > data[index + 1])
+			pairs.push_back(Pair(data[index], data[index + 1]));
+		else
+			pairs.push_back(Pair(data[index + 1], data[index]));
+	}
+
+	// Track leftover element if data size is odd
+	int leftover;
+	bool hasLeftover = false;
+	if (dataSize % 2 == 1)
+	{
+		leftover = data[dataSize - 1];
+		hasLeftover = true;
+	}
+
+	// Extract winners for recursive sorting
 	std::vector<int> winners;
 	winners.reserve(pairs.size());
-	for (std::size_t i = 0; i < pairs.size(); ++i)
-		winners.push_back(pairs[i].winner);
+	for (std::size_t index = 0; index < pairs.size(); ++index)
+		winners.push_back(pairs[index].winner);
 
-	fordJohnsonVector(winners);
+	// RECURSIVE CALL: Sort the winners
+	std::vector<int> sortedWinners = mergeInsertSort(winners);
 
-	// Reorder pairs based on sorted winners
-	std::vector<Pair<T> > sortedPairs;
+	// Create a mapping from sorted winners back to their original pairs
+	std::vector<Pair> sortedPairs;
 	sortedPairs.reserve(pairs.size());
-	std::vector<bool> used(pairs.size(), false);
-	for (std::size_t i = 0; i < winners.size(); ++i)
+	std::vector<bool> pairUsed(pairs.size(), false);
+	
+	for (std::size_t index = 0; index < sortedWinners.size(); ++index)
 	{
-		for (std::size_t j = 0; j < pairs.size(); ++j)
+		// Find which pair this winner came from
+		for (std::size_t pairIndex = 0; pairIndex < pairs.size(); ++pairIndex)
 		{
-			if (!used[j] && pairs[j].winner == winners[i])
+			if (!pairUsed[pairIndex] && pairs[pairIndex].winner == sortedWinners[index])
 			{
-				sortedPairs.push_back(pairs[j]);
-				used[j] = true;
+				sortedPairs.push_back(pairs[pairIndex]);
+				pairUsed[pairIndex] = true;
 				break;
 			}
 		}
 	}
-	pairs = sortedPairs;
 
-	// Step 3: Build initial main chain
-	std::vector<int> chain;
-	chain.reserve(n);
-	chain.push_back(pairs[0].loser); // b_1 inserted for free
-	for (std::size_t i = 0; i < pairs.size(); ++i)
-		chain.push_back(pairs[i].winner);
+	// Build sorted chain using Ford-Johnson insertion
+	std::vector<int> sortedChain;
+	sortedChain.reserve(dataSize);
 
-	// Step 4: Insert remaining losers using Jacobsthal order
-	std::size_t pendSize = pairs.size() - 1 + (hasStraggler ? 1 : 0);
-	std::vector<std::size_t> order = jacobsthalOrder(pendSize);
-	for (std::size_t i = 0; i < order.size(); ++i)
+	// Insert first loser (smallest among winners)
+	if (!sortedPairs.empty())
+		sortedChain.push_back(sortedPairs[0].loser);
+
+	// Insert all winners
+	for (std::size_t index = 0; index < sortedPairs.size(); ++index)
+		sortedChain.push_back(sortedPairs[index].winner);
+
+	// Track current position of each winner in sortedChain
+	std::vector<std::size_t> winnerPositions(sortedPairs.size());
+	for (std::size_t i = 0; i < sortedPairs.size(); ++i)
+		winnerPositions[i] = i + 1; // Initial position: 1 for first loser + i
+
+	// Insert remaining losers using Jacobsthal order with bounded binary search
+	// Determine how many losers need to be inserted (excluding first loser already inserted)
+	std::size_t numLosersToInsert = sortedPairs.size() - 1;
+	if (hasLeftover)
+		numLosersToInsert++; // Include leftover in the count
+
+	std::vector<std::size_t> insertionOrder = jacobsthalOrder(numLosersToInsert);
+
+	for (std::size_t orderIndex = 0; orderIndex < insertionOrder.size(); ++orderIndex)
 	{
-		std::size_t idx = order[i];
-		T valueToInsert;
-		std::size_t maxPos;
-		if (idx < pairs.size() - 1)
+		int valueToInsert;
+		std::vector<int>::iterator searchEnd;
+
+		// Check if this is the leftover element
+		if (insertionOrder[orderIndex] == sortedPairs.size() - 1 && hasLeftover)
 		{
-			valueToInsert = pairs[idx + 1].loser;
-			maxPos = idx + 2;
+			valueToInsert = leftover;
+			searchEnd = sortedChain.end(); // No bound for leftover
 		}
 		else
 		{
-			valueToInsert = straggler;
-			maxPos = chain.size();
+			// Regular loser from a pair (offset by 1 because first loser already inserted)
+			valueToInsert = sortedPairs[insertionOrder[orderIndex] + 1].loser;
+
+			// Use tracked position of the corresponding winner to bound the search
+			searchEnd = sortedChain.begin() + winnerPositions[insertionOrder[orderIndex] + 1];
 		}
 
-		// Binary search with bounded range
-		std::vector<int>::iterator pos = std::lower_bound(
-			chain.begin(),
-			chain.begin() + std::min(maxPos, chain.size()),
-			valueToInsert
-		);
-		chain.insert(pos, valueToInsert);
+		std::vector<int>::iterator insertPos = std::lower_bound(sortedChain.begin(), searchEnd, valueToInsert);
+		sortedChain.insert(insertPos, valueToInsert);
+
+		// Update positions: all winners after the insertion point shift by 1
+		std::size_t insertedAt = insertPos - sortedChain.begin();
+		for (std::size_t i = 0; i < winnerPositions.size(); ++i)
+			if (winnerPositions[i] >= insertedAt)
+				winnerPositions[i]++;
+
 	}
 
-	data = chain;
+	return sortedChain;
 }
 
-// ----------------------------------------------------------------
-// Deque version of Ford-Johnson algorithm
-// ----------------------------------------------------------------
-
-static void fordJohnsonDeque(std::deque<int> &data)
+// =======================================================
+// Deque wrapper
+// =======================================================
+std::deque<int> PmergeMe::mergeInsertSort(const std::deque<int>& data)
 {
-	typedef int T;
-	std::size_t n = data.size();
-
-	// Base cases
-	if (n <= 1)
-		return;
-	if (n == 2)
-	{
-		if (data[0] > data[1])
-			std::swap(data[0], data[1]);
-		return;
-	}
-
-	// Step 1: Pair and compare
-	std::vector<Pair<T> > pairs;
-	for (std::size_t i = 0; i + 1 < n; i += 2)
-	{
-		if (data[i] > data[i + 1])
-			pairs.push_back(Pair<T>(data[i], data[i + 1]));
-		else
-			pairs.push_back(Pair<T>(data[i + 1], data[i]));
-	}
-
-	// Handle odd element
-	T straggler = T();
-	bool hasStraggler = (n % 2 == 1);
-	if (hasStraggler)
-		straggler = data[n - 1];
-
-	// Step 2: Recursively sort winners
-	std::deque<int> winners;
-	for (std::size_t i = 0; i < pairs.size(); ++i)
-		winners.push_back(pairs[i].winner);
-
-	fordJohnsonDeque(winners);
-
-	// Reorder pairs based on sorted winners
-	std::vector<Pair<T> > sortedPairs;
-	std::vector<bool> used(pairs.size(), false);
-	for (std::size_t i = 0; i < winners.size(); ++i)
-	{
-		for (std::size_t j = 0; j < pairs.size(); ++j)
-		{
-			if (!used[j] && pairs[j].winner == winners[i])
-			{
-				sortedPairs.push_back(pairs[j]);
-				used[j] = true;
-				break;
-			}
-		}
-	}
-	pairs = sortedPairs;
-
-	// Step 3: Build initial main chain
-	std::deque<int> chain;
-	chain.push_back(pairs[0].loser); // b_1 inserted for free
-	for (std::size_t i = 0; i < pairs.size(); ++i)
-		chain.push_back(pairs[i].winner);
-
-	// Step 4: Insert remaining losers using Jacobsthal order
-	std::size_t pendSize = pairs.size() - 1 + (hasStraggler ? 1 : 0);
-	std::vector<std::size_t> order = jacobsthalOrder(pendSize);
-	for (std::size_t i = 0; i < order.size(); ++i)
-	{
-		std::size_t idx = order[i];
-		T valueToInsert;
-		std::size_t maxPos;
-		if (idx < pairs.size() - 1)
-		{
-			valueToInsert = pairs[idx + 1].loser;
-			maxPos = idx + 2;
-		}
-		else
-		{
-			valueToInsert = straggler;
-			maxPos = chain.size();
-		}
-
-		// Binary search with bounded range
-		std::deque<int>::iterator pos = std::lower_bound(
-			chain.begin(),
-			chain.begin() + std::min(maxPos, chain.size()),
-			valueToInsert
-		);
-		chain.insert(pos, valueToInsert);
-	}
-
-	data = chain;
-}
-
-std::vector<int> PmergeMe::mergeInsertSort(const std::vector<int> &data)
-{
-	std::vector<int> result = data;
-	fordJohnsonVector(result);
-	return result;
-}
-
-std::deque<int> PmergeMe::mergeInsertSort(const std::deque<int> &data)
-{
-	std::deque<int> result = data;
-	fordJohnsonDeque(result);
-	return result;
+	return data;
 }
