@@ -106,16 +106,16 @@ int	main(int argc, char **argv)
 		size_t bar = line.find('|');
 		if (bar == std::string::npos)
 		{
-			std::cerr << "Error: invalid input => " << line << std::endl;
+			std::cerr << "Error: bad input => " << line << std::endl;
 			continue ;
 		}
 
 		std::string date = trimString(line.substr(0, bar));
 		std::string valueStr = trimString(line.substr(bar + 1));
 
-		if (date.size() != 10 || date[4] != '-' || date[7] != '-')
+		if (!BitcoinExchange::isValidDate(date))
 		{
-			std::cerr << "Error: invalid input => " << line << std::endl;
+			std::cerr << "Error: bad input => " << line << std::endl;
 			continue ;
 		}
 
