@@ -44,6 +44,20 @@ std::string getDataFilePath()
 	return "";
 }
 
+static std::string trimString(const std::string &s)
+{
+	if (s.empty())
+		return "";
+	size_t start = 0;
+	while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start])))
+		++start;
+	if (start == s.size())
+		return "";
+	size_t end = s.size() - 1;
+	while (end > start && std::isspace(static_cast<unsigned char>(s[end])))
+		--end;
+	return s.substr(start, end - start + 1);
+}
 
 int	main(int argc, char **argv)
 {
@@ -74,14 +88,8 @@ int	main(int argc, char **argv)
 		std::cerr << "Error: input file is empty." << std::endl;
 		return 1;
 	}
-	
-	std::string trimmedLine = line;
-	size_t start = trimmedLine.find_first_not_of(" \t");
-	if (start != std::string::npos)
-	{
-		size_t end = trimmedLine.find_last_not_of(" \t");
-		trimmedLine = trimmedLine.substr(start, end - start + 1);
-	}
+
+	std::string trimmedLine = trimString(line);
 	
 	if (trimmedLine != "date | value")
 	{
@@ -91,12 +99,7 @@ int	main(int argc, char **argv)
 
 	while (std::getline(in, line))
 	{
-		start = line.find_first_not_of(" \t");
-		if (start == std::string::npos)
-			continue;
-		size_t end = line.find_last_not_of(" \t");
-		line = line.substr(start, end - start + 1);
-		
+		line = trimString(line);
 		if (line.empty())
 			continue ;
 
@@ -107,19 +110,8 @@ int	main(int argc, char **argv)
 			continue ;
 		}
 
-		std::string date = line.substr(0, bar);
-		start = date.find_first_not_of(" \t");
-		if (start != std::string::npos) {
-			end = date.find_last_not_of(" \t");
-			date = date.substr(start, end - start + 1);
-		}
-		
-		std::string valueStr = line.substr(bar + 1);
-		start = valueStr.find_first_not_of(" \t");
-		if (start != std::string::npos) {
-			end = valueStr.find_last_not_of(" \t");
-			valueStr = valueStr.substr(start, end - start + 1);
-		}
+		std::string date = trimString(line.substr(0, bar));
+		std::string valueStr = trimString(line.substr(bar + 1));
 
 		if (date.size() != 10 || date[4] != '-' || date[7] != '-')
 		{
